@@ -1,6 +1,4 @@
-\# OpenGD77Melody
-
-
+# OpenGD77Melody
 
 A tiny, client-side HTML / JAVA-Script tool to convert human-readable melodies into the numeric boot-melody format used by OpenGD77 firmware — and to preview the melody in your browser.
 
