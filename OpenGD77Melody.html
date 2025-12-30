@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Text → OpenGD77 Converter & Player — DO9RE (Richard Emling)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; padding:1rem; background:#fff; color:#000; line-height:1.4; }
+    h1 { font-size:1.2rem; margin:0 0 .25rem 0; }
+    .meta { font-size:.9rem; color:#333; margin-bottom:1rem; }
+    label, button { display:block; margin-top:.5rem; }
+    textarea { width:100%; height:10rem; font-family:monospace; font-size:1rem; }
+    input[type="text"], input[type="number"] { width:100%; font-family:monospace; font-size:1rem; }
+    .controls { margin-top:.5rem; }
+    .status { margin-top:.75rem; }
+    .row { display:flex; gap:.5rem; align-items:center; margin-top:.5rem; }
+    .row > * { flex:1 1 auto; }
+    .small { width:7.5rem; }
+    .doc { margin-top:1rem; padding:.75rem; border:1px solid #ddd; background:#fafafa; }
+    .doc pre { white-space:pre-wrap; font-family:monospace; font-size:.95rem; }
+    .visually-hidden { position: absolute !important; height: 1px; width: 1px; overflow: hidden; clip: rect(1px, 1px, 1px, 1px); white-space: nowrap; border: 0; padding: 0; margin: -1px; }
+    button { padding:.45rem .6rem; font-size:1rem; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <h1>Text → OpenGD77 Converter & Player</h1>
+  <div class="meta">Author: Richard Emling — callsign DO9RE</div>
+
+  <p id="instructions">
+    Enter a human-readable sequence of notes and rests. Each event is ONE token formatted as NAME:DURATION and tokens are separated by spaces or commas.
+    After you press "Play & Convert" the OpenGD77 numeric notation string will be generated and placed into the output field where you can copy it to the clipboard.
+  </p>
+
+  <label for="humanSeq">Human-readable sequence (example):</label>
+  <textarea id="humanSeq" aria-label="Human readable sequence" spellcheck="false">C4:quarter D4:quarter E4:half R:quarter G4:quarter</textarea>
+
+  <div class="controls" role="region" aria-label="Settings">
+    <label for="bpm">BPM (tempo):
+      <input id="bpm" class="small" type="number" value="120" min="20" max="400" aria-label="BPM">
+    </label>
+
+    <label for="unitsPerQuarter">Units per quarter-note (unitsPerQuarter):
+      <input id="unitsPerQuarter" class="small" type="number" value="6" min="1" aria-label="Units per quarter note">
+    </label>
+
+    <div class="row" aria-hidden="false">
+      <button id="play">Play & Convert</button>
+      <button id="stop">Stop</button>
+    </div>
+  </div>
+
+  <label for="numericOut">OpenGD77 numeric notation (produced after "Play & Convert"):</label>
+  <div class="row">
+    <input id="numericOut" type="text" aria-label="OpenGD77 numeric string" readonly />
+    <button id="copyBtn">Copy</button>
+  </div>
+
+  <div class="row" style="margin-top:.6rem;">
+    <button id="toggleDoc" aria-expanded="false">Show detailed documentation and examples</button>
+  </div>
+
+  <div id="doc" class="doc" style="display:none;" aria-hidden="true">
+    <strong>Detailed documentation (English)</strong>
+
+    <pre>
+Format summary
+- Input (human-readable): sequence of tokens NAME:DURATION separated by spaces or commas.
+  Example token: C4:quarter
+- NAME:
+  - Note names: A–G, optional '#' or 'b', followed by octave number (e.g. C4, F#3, Bb2). Octave may be negative (e.g. C-1).
+  - Rest: use R or Rest (case-insensitive).
+- DURATION:
+  - Words: whole / half / quarter / eighth / sixteenth (or shortcuts w/h/q/e/s)
+  - Numeric: a number in quarter-note units (1 = quarter note). Examples:
+      1   -> quarter
+      0.5 -> eighth
+      2   -> half
+  - The converter multiplies duration-in-quarters by the "unitsPerQuarter" setting and rounds to nearest integer to produce the OpenGD77 length value.
+
+OpenGD77 numeric pair format
+- Output: flat sequence of integer pairs separated by commas:
+    note,length,note,length,...
+  - note = integer pitch code (0 indicates a rest/pause)
+  - length = integer length units (units relative to unitsPerQuarter)
+- Example:
+  Input:  C4:quarter D4:quarter E4:half R:quarter G4:quarter
+  unitsPerQuarter = 6
+  Output: 60,6,62,6,64,12,0,6,67,6
+  (Here 60/62/64/67 are MIDI numbers for C4/D4/E4/G4; length 6 = one quarter when unitsPerQuarter=6)
+
+Notes about unitsPerQuarter
+- Default suggested value: 6 (fits many OpenGD77 example sequences; dot = 2 in some Morse examples, dash = 6)
+- Change unitsPerQuarter only if you need a different granularity for lengths.
+- The converter rounds quarter-based durations * unitsPerQuarter to the nearest integer.
+
+Playback behavior
+- "Play & Convert" will:
+  1) parse your human-readable text,
+  2) produce the OpenGD77 numeric string (placed in the output field),
+  3) immediately play the melody using WebAudio at the BPM you provided (BPM affects playback only, not the numeric output).
+- Use "Stop" to halt playback early.
+
+Tips & troubleshooting
+- If a token is malformed it will be ignored (no output for that token).
+- If a note name cannot be parsed a token is skipped.
+- If the numeric result is empty, check your input syntax.
+- Playback uses a simple synthesized tone (sine + triangle mix). It is monophonic and is only a preview — the numeric string is what you copy to upload to OpenGD77.
+
+Accessibility & keyboard
+- Space toggles play/stop when focus is not in the text area.
+- Buttons and fields are labeled for screen readers.
+
+Author & support
+- Author: Richard Emling — callsign DO9RE
+    </pre>
+  </div>
+
+  <div class="status" aria-live="polite" id="status">Ready. Enter a human-readable sequence and press "Play & Convert".</div>
+
+<script>
+/* Text -> OpenGD77 converter & player (English UI) by Richard Emling DO9RE
+   Only forward conversion: human -> numeric OpenGD77 pairs.
+   Behavior: pressing Play & Convert produces numeric string and plays melody via WebAudio.
+*/
+
+const humanSeq = document.getElementById('humanSeq');
+const bpmInput = document.getElementById('bpm');
+const unitsInput = document.getElementById('unitsPerQuarter');
+const playBtn = document.getElementById('play');
+const stopBtn = document.getElementById('stop');
+const numericOut = document.getElementById('numericOut');
+const copyBtn = document.getElementById('copyBtn');
+const statusEl = document.getElementById('status');
+
+const toggleDocBtn = document.getElementById('toggleDoc');
+const docDiv = document.getElementById('doc');
+
+let audioCtx = null;
+let scheduled = [];
+let stopTimeout = null;
+let running = false;
+
+function setStatus(t){ statusEl.textContent = t; }
+
+/* Note name -> MIDI number */
+const SEMITONE = { 'C':0,'D':2,'E':4,'F':5,'G':7,'A':9,'B':11 };
+function noteNameToMidi(noteStr) {
+  if (!noteStr) return null;
+  // Accept forms like C4, C#4, Db3, C-1
+  const m = noteStr.match(/^([A-Ga-g])([#b]?)(-?\d+)$/);
+  if (!m) return null;
+  let [, letter, accidental, octaveStr] = m;
+  letter = letter.toUpperCase();
+  let sem = SEMITONE[letter];
+  if (accidental === '#') sem += 1;
+  if (accidental === 'b') sem -= 1;
+  const octave = parseInt(octaveStr, 10);
+  const midi = 12 + (octave * 12) + sem; // C0 = 12, C4 = 60
+  if (midi < 0 || midi > 127) return null;
+  return midi;
+}
+
+/* Duration parsing: returns duration in quarter-notes (1 = quarter) */
+function durationTokenToQuarters(tok) {
+  if (!tok) return null;
+  const t = tok.trim().toLowerCase();
+  const map = { 'whole':4,'w':4,'half':2,'h':2,'quarter':1,'q':1,'eighth':0.5,'e':0.5,'sixteenth':0.25,'s':0.25 };
+  if (map[t] !== undefined) return map[t];
+  const num = parseFloat(t);
+  if (!isNaN(num)) return num;
+  return null;
+}
+
+/* Parse human readable text into events */
+function parseHumanText(text) {
+  const tokens = text.split(/[\s,]+/).map(s=>s.trim()).filter(Boolean);
+  const events = [];
+  for (const tok of tokens) {
+    const parts = tok.split(':');
+    if (parts.length !== 2) continue;
+    const name = parts[0].trim();
+    const durTok = parts[1].trim();
+    const quarters = durationTokenToQuarters(durTok);
+    if (quarters === null) continue;
+    if (/^r$/i.test(name) || /^rest$/i.test(name)) {
+      events.push({ type:'rest', quarters });
+    } else {
+      const midi = noteNameToMidi(name);
+      if (midi === null) continue;
+      events.push({ type:'note', midi, quarters });
+    }
+  }
+  return events;
+}
+
+/* Convert human events to numeric OpenGD77 string (note,length pairs) */
+function humanEventsToNumericString(events, unitsPerQuarter) {
+  const parts = [];
+  for (const ev of events) {
+    const lengthUnits = Math.max(0, Math.round(ev.quarters * unitsPerQuarter));
+    if (ev.type === 'rest') {
+      parts.push(0, lengthUnits);
+    } else {
+      parts.push(ev.midi, lengthUnits);
+    }
+  }
+  return parts.join(',');
+}
+
+/* WebAudio scheduling (simple monophonic preview) */
+function ensureAudioCtx(){
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  else if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+function freqFromMidi(n){ return 440 * Math.pow(2, (n - 69) / 12); }
+function scheduleNote(midi, startTime, duration){
+  ensureAudioCtx();
+  const osc1 = audioCtx.createOscillator();
+  const osc2 = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  osc1.type = 'sine';
+  osc2.type = 'triangle';
+  osc1.frequency.setValueAtTime(freqFromMidi(midi), startTime);
+  osc2.frequency.setValueAtTime(freqFromMidi(midi)*2.01, startTime);
+
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(0.9, startTime + 0.01);
+  gain.gain.linearRampToValueAtTime(0.6, startTime + 0.15);
+  gain.gain.linearRampToValueAtTime(0.0001, startTime + duration + 0.05);
+
+  osc1.connect(gain); osc2.connect(gain); gain.connect(audioCtx.destination);
+  osc1.start(startTime); osc2.start(startTime);
+  osc1.stop(startTime + duration + 0.1); osc2.stop(startTime + duration + 0.1);
+
+  scheduled.push({osc1, osc2, gain});
+}
+
+/* Clear scheduled audio nodes and timeouts */
+function clearScheduled(){
+  if (stopTimeout) { clearTimeout(stopTimeout); stopTimeout = null; }
+  for (const s of scheduled) {
+    try { if (s.osc1) s.osc1.stop(0); } catch(e){}
+    try { if (s.osc2) s.osc2.stop(0); } catch(e){}
+    try { if (s.gain) s.gain.disconnect(); } catch(e){}
+  }
+  scheduled = [];
+  if (audioCtx && audioCtx.state !== 'suspended') {
+    // suspend to ensure silence
+    audioCtx.suspend();
+  }
+}
+
+/* Play & Convert flow */
+function playAndConvert() {
+  if (running) return;
+  const humanText = humanSeq.value;
+  const bpm = Number(bpmInput.value) || 120;
+  const unitsPerQuarter = Math.max(1, Math.round(Number(unitsInput.value) || 6));
+
+  const events = parseHumanText(humanText);
+  if (events.length === 0) {
+    setStatus('No valid events found. Please check your input syntax.');
+    return;
+  }
+
+  // Convert to numeric string and show immediately
+  const numericStr = humanEventsToNumericString(events, unitsPerQuarter);
+  numericOut.value = numericStr;
+  numericOut.select && numericOut.select();
+
+  // Playback scheduling (WebAudio)
+  ensureAudioCtx();
+  running = true;
+  setStatus('Playing and producing OpenGD77 notation...');
+
+  const startNow = audioCtx.currentTime + 0.05;
+  let cursor = 0;
+  for (const ev of events) {
+    const durationSec = ev.quarters * (60 / bpm);
+    if (ev.type === 'note') {
+      scheduleNote(ev.midi, startNow + cursor, durationSec);
+    }
+    cursor += durationSec;
+  }
+
+  stopTimeout = setTimeout(()=> {
+    running = false;
+    clearScheduled();
+    setStatus('Done. OpenGD77 notation created — you can copy it now.');
+  }, Math.max(100, Math.round(cursor*1000)) + 200);
+}
+
+/* UI bindings */
+playBtn.addEventListener('click', () => {
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  playAndConvert();
+});
+
+stopBtn.addEventListener('click', () => {
+  if (!running) { setStatus('Not running.'); return; }
+  clearScheduled();
+  running = false;
+  setStatus('Playback stopped.');
+});
+
+copyBtn.addEventListener('click', async () => {
+  const val = numericOut.value;
+  if (!val) { setStatus('No OpenGD77 notation to copy.'); return; }
+  try {
+    await navigator.clipboard.writeText(val);
+    setStatus('Copied to clipboard.');
+  } catch (e) {
+    numericOut.select();
+    try {
+      document.execCommand('copy');
+      setStatus('Copied to clipboard (fallback).');
+    } catch (e2) {
+      setStatus('Copy failed. Select and copy manually.');
+    }
+  }
+});
+
+/* Toggle documentation */
+toggleDocBtn.addEventListener('click', () => {
+  const showing = docDiv.style.display !== 'none';
+  if (showing) {
+    docDiv.style.display = 'none';
+    toggleDocBtn.textContent = 'Show detailed documentation and examples';
+    toggleDocBtn.setAttribute('aria-expanded', 'false');
+    docDiv.setAttribute('aria-hidden', 'true');
+  } else {
+    docDiv.style.display = 'block';
+    toggleDocBtn.textContent = 'Hide documentation';
+    toggleDocBtn.setAttribute('aria-expanded', 'true');
+    docDiv.setAttribute('aria-hidden', 'false');
+  }
+});
+
+/* Keyboard: space toggles play/stop when textarea not focused */
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && document.activeElement !== humanSeq) {
+    e.preventDefault();
+    if (running) stopBtn.click(); else playBtn.click();
+  }
+});
+
+/* Initial status */
+setStatus('Ready. Enter a human-readable sequence and press "Play & Convert". Author: Richard Emling (DO9RE).');
+
+</script>
+</body>
+</html>
