@@ -4,39 +4,39 @@ A tiny, client-side HTML / JAVA-Script tool to convert human-readable melodies i
 
 
 
-\## Purpose
+## Purpose
 
 Make it easy for amateur radio users to create and test boot melodies for radios running OpenGD77 firmware. Enter simple note/duration tokens, click "Play \& Convert", copy the generated numeric string and paste it into your OpenGD77 CPS.
 
 
 
-\## Quick usage
+## Quick usage
 
-1\. Open `OpenGD77Melody.html` in a modern browser.
+1. Open `OpenGD77Melody.html` in a modern browser.
 
-2\. Enter a sequence of tokens in the "Human-readable sequence" field.
+2. Enter a sequence of tokens in the "Human-readable sequence" field.
 
-3\. Adjust BPM (playback tempo) and Units per quarter-note (granularity).
+3. Adjust BPM (playback tempo) and Units per quarter-note (granularity).
 
-4\. Click \*\*Play \& Convert\*\* to generate the OpenGD77 numeric string and hear a preview.
+4. Click \*\*Play \& Convert\*\* to generate the OpenGD77 numeric string and hear a preview.
 
-5\. Click \*\*Copy\*\* to copy the numeric string to the clipboard for use with OpenGD77.
-
-
-
-\## Input format
-
-\- Tokens are NAME:DURATION separated by spaces or commas.
-
-\- NAME: note (A–G, optional `#` or `b`, and octave number, e.g. `C4`, `F#3`, `Bb2`) or rest `R` / `Rest`.
-
-\- DURATION: words (`whole`, `half`, `quarter`, `eighth`, `sixteenth` or `w/h/q/e/s`) or numeric quarter-note units (e.g. `1`, `0.5`, `2`).
-
-\- The tool multiplies durations (in quarters) by `unitsPerQuarter` and rounds to the nearest integer to produce the numeric lengths.
+5. Click \*\*Copy\*\* to copy the numeric string to the clipboard for use with OpenGD77.
 
 
 
-\## Example
+## Input format
+
+- Tokens are NAME:DURATION separated by spaces or commas.
+
+- NAME: note (A–G, optional `#` or `b`, and octave number, e.g. `C4`, `F#3`, `Bb2`) or rest `R` / `Rest`.
+
+- DURATION: words (`whole`, `half`, `quarter`, `eighth`, `sixteenth` or `w/h/q/e/s`) or numeric quarter-note units (e.g. `1`, `0.5`, `2`).
+
+- The tool multiplies durations (in quarters) by `unitsPerQuarter` and rounds to the nearest integer to produce the numeric lengths.
+
+
+
+## Example
 
 Input:
 
@@ -58,17 +58,17 @@ With `unitsPerQuarter = 6` the output will be:
 
 
 
-\## Notes
+## Notes
 
-\- Playback (BPM) is only for preview and does not affect the numeric output.
+- Playback (BPM) is only for preview and does not affect the numeric output.
 
-\- Malformed tokens are ignored; check the status area for parsing feedback.
+- Malformed tokens are ignored; check the status area for parsing feedback.
 
-\- Default suggested `unitsPerQuarter` is 6 for good granularity with OpenGD77.
+- Default suggested `unitsPerQuarter` is 6 for good granularity with OpenGD77.
 
 
 
-\## Author
+## Author
 
 Richard Emling — DO9RE
 
