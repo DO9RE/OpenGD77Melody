@@ -68,6 +68,24 @@ With `unitsPerQuarter = 6` the output will be:
 
 
 
+## MIDI import
+
+- Quick overview  
+  Upload a standard SMF (.mid) file, select one track, and click "Import track". The chosen track is converted to the human-readable token format (NAME:DURATION) and inserted into the textarea for manual editing.
+
+- Intended use & important rules  
+  - This importer is designed for monophonic tracks only (OpenGD77 plays one note at a time). For reliable results, export and trim a single melodic track from your DAW before importing.  
+  - If multiple notes start at the same tick, the importer keeps only the lowest (deepest) MIDI note and ignores the rest. Velocity and other MIDI controllers are ignored.  
+  - The textarea shows the original pitches as found in the MIDI file (so you can edit in familiar pitch). The numeric OpenGD77 output (and the playback preview) is automatically transposed down by two octaves (−24 semitones) when you press “Play & Convert”.
+
+- How durations are handled  
+  - The parser reads note start/end ticks and uses the file’s ticks-per-quarter value to convert durations into quarter-note units (1 = quarter). Those quarter values are then multiplied by the UI’s `unitsPerQuarter` and rounded to produce integer length units for the OpenGD77 numeric output.  
+  - The implementation enforces a minimum numeric length of 1 unit (no 0-length pairs are produced).
+
+- Limitations & tips  
+  - The built-in SMF parser is lightweight — it handles Note On/Off, running status and basic meta events (track name, end-of-track), but it is not a full-featured MIDI library. Unusual or heavily edited MIDI files may produce suboptimal results.  
+  - If your track contains chords or overlapping polyphony, prepare a monophonic version (mute other instruments or export a single monophonic line) before import.  
+
 ## Author
 
 Richard Emling — DO9RE
