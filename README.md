@@ -6,7 +6,7 @@ A tiny, client-side HTML / JAVA-Script tool to convert human-readable melodies i
 
 ## Purpose
 
-Make it easy for amateur radio users to create and test boot melodies for radios running OpenGD77 firmware. Enter simple note/duration tokens, click "Play \& Convert", copy the generated numeric string and paste it into your OpenGD77 CPS.
+Make it easy for amateur radio users to create and test boot melodies for radios running OpenGD77 firmware. Enter simple note/duration tokens, click "Play & Convert", copy the generated numeric string and paste it into your OpenGD77 CPS.
 
 
 
@@ -18,9 +18,9 @@ Make it easy for amateur radio users to create and test boot melodies for radios
 
 3. Adjust BPM (playback tempo) and Units per quarter-note (granularity).
 
-4. Click \*\*Play \& Convert\*\* to generate the OpenGD77 numeric string and hear a preview.
+4. Click **Play & Convert** to generate the OpenGD77 numeric string and hear a preview.
 
-5. Click \*\*Copy\*\* to copy the numeric string to the clipboard for use with OpenGD77.
+5. Click **Copy** to copy the numeric string to the clipboard for use with OpenGD77.
 
 
 
