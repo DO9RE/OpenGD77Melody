@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Text → OpenGD77 Converter & Player — DO9RE (Richard Emling)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; padding:1rem; background:#fff; color:#000; line-height:1.4; }
+    h1 { font-size:1.2rem; margin:0 0 .25rem 0; }
+    .meta { font-size:.9rem; color:#333; margin-bottom:1rem; }
+    label, button { display:block; margin-top:.5rem; }
+    textarea { width:100%; height:10rem; font-family:monospace; font-size:1rem; }
+    input[type="text"], input[type="number"] { width:100%; font-family:monospace; font-size:1rem; }
+    .controls { margin-top:.5rem; }
+    .status { margin-top:.75rem; }
+    .row { display:flex; gap:.5rem; align-items:center; margin-top:.5rem; }
+    .row > * { flex:1 1 auto; }
+    .small { width:7.5rem; }
+    .doc { margin-top:1rem; padding:.75rem; border:1px solid #ddd; background:#fafafa; }
+    .doc pre { white-space:pre-wrap; font-family:monospace; font-size:.95rem; }
+    .visually-hidden { position: absolute !important; height: 1px; width: 1px; overflow: hidden; clip: rect(1px, 1px, 1px, 1px); white-space: nowrap; border: 0; padding: 0; margin: -1px; }
+    button { padding:.45rem .6rem; font-size:1rem; cursor:pointer; }
+    .inline { display:inline-flex; gap:.5rem; align-items:center; }
+    select { font-family:monospace; }
+    .muted { color:#666; font-size:.9rem; margin-top:.4rem; }
+  </style>
+</head>
+<body>
+  <h1>Text → OpenGD77 Converter & Player</h1>
+  <div class="meta">Author: Richard Emling — callsign DO9RE</div>
+
+  <p id="instructions">
+    Enter a human-readable sequence of notes and rests. Each event is ONE token formatted as NAME:DURATION and tokens are separated by spaces or commas.
+    After you press "Play & Convert" the OpenGD77 numeric notation string will be generated and placed into the output field where you can copy it to the clipboard.
+  </p>
+
+  <label for="humanSeq">Human-readable sequence (example):</label>
+  <textarea id="humanSeq" aria-label="Human readable sequence" spellcheck="false">C4:quarter D4:quarter E4:half R:quarter G4:quarter</textarea>
+
+  <div class="controls" role="region" aria-label="Settings">
+    <label for="bpm">BPM (tempo):
+      <input id="bpm" class="small" type="number" value="120" min="20" max="400" aria-label="BPM">
+    </label>
+
+    <label for="unitsPerQuarter">Units per quarter-note (unitsPerQuarter):
+      <input id="unitsPerQuarter" class="small" type="number" value="6" min="1" aria-label="Units per quarter note">
+    </label>
+
+    <div class="row" aria-hidden="false">
+      <button id="play">Play & Convert</button>
+      <button id="stop">Stop</button>
+    </div>
+  </div>
+
+  <label for="numericOut">OpenGD77 numeric notation (produced after "Play & Convert"):</label>
+  <div class="row">
+    <input id="numericOut" type="text" aria-label="OpenGD77 numeric string" readonly />
+    <button id="copyBtn">Copy</button>
+  </div>
+
+  <div class="row" style="margin-top:.6rem;">
+    <button id="toggleDoc" aria-expanded="false">Show detailed documentation and examples</button>
+  </div>
+
+  <div id="doc" class="doc" style="display:none;" aria-hidden="true">
+    <strong>Detailed documentation</strong>
+
+    <pre>
+Format summary
+- Input (human-readable): sequence of tokens NAME:DURATION separated by spaces or commas.
+  Example token: C4:quarter
+- NAME:
+  - Note names: A–G, optional '#' or 'b', followed by octave number (e.g. C4, F#3, Bb2). 
+  - Rest: use R or Rest (case-insensitive).
+- DURATION:
+  - Words: whole / half / quarter / eighth / sixteenth (or shortcuts w/h/q/e/s)
+  - Numeric: a number in quarter-note units (1 = quarter note). Examples:
+      1   -> quarter
+      0.5 -> eighth
+      2   -> half
+  - The converter multiplies duration-in-quarters by the "unitsPerQuarter" setting and rounds to nearest integer to produce the OpenGD77 length value.
+
+OpenGD77 numeric pair format
+- Output: flat sequence of integer pairs separated by commas:
+    note,length,note,length,...
+  - note = integer pitch code (0 indicates a rest/pause)
+  - length = integer length units (units relative to unitsPerQuarter)
+- Example:
+  Input:  C4:quarter D4:quarter E4:half R:quarter G4:quarter
+  unitsPerQuarter = 6
+  Output: 60,6,62,6,64,12,0,6,67,6
+  (Here 60/62/64/67 are MIDI numbers for C4/D4/E4/G4; length 6 = one quarter when unitsPerQuarter=6)
+
+Notes about unitsPerQuarter
+- Default suggested value: 6 (fits many OpenGD77 example sequences; dot = 2 in some Morse examples, dash = 6)
+- Change unitsPerQuarter only if you need a different granularity for lengths.
+- The converter rounds quarter-based durations * unitsPerQuarter to the nearest integer.
+
+Playback behavior
+- "Play & Convert" will:
+  1) parse your human-readable text,
+  2) produce the OpenGD77 numeric string (placed in the output field),
+  3) immediately play the melody using WebAudio at the BPM you provided (BPM affects playback only, not the numeric output).
+- Use "Stop" to halt playback early.
+
+Tips & troubleshooting
+- If a token is malformed it will be ignored (no output for that token).
+- If a note name cannot be parsed a token is skipped.
+- If the numeric result is empty, check your input syntax.
+- Playback uses a simple synthesized tone (sine + triangle mix). It is monophonic and is only a preview — the numeric string is what you copy to upload to OpenGD77.
+
+Accessibility & keyboard
+- Space toggles play/stop when focus is not in the text area.
+- Buttons and fields are labeled for screen readers.
+
+Author & support
+- Author: Richard Emling — callsign DO9RE
+    </pre>
+  </div>
+
+  <!-- MIDI import UI -->
+  <div class="doc" style="margin-top:1rem;">
+    <strong>Import MIDI (experimental)</strong>
+    <div class="muted">
+      Upload a .mid file, choose a track and click "Import track".
+      The chosen track will be converted to the human-readable format (NAME:DURATION ...) and inserted into the input box for manual editing.
+    </div>
+
+    <div class="muted" style="margin-top:.4rem; font-weight:600;">
+      IMPORTANT: OpenGD77 only supports monophonic melodies (one note at a time). Provide a monophonic track.
+      If multiple notes start at the same tick in the selected track, only the lowest note is kept; others are ignored.
+      Note: When you press "Play & Convert" the numeric OpenGD77 output and the playback are transposed DOWN by two octaves (−24 semitones) automatically.
+    </div>
+
+    <label for="midiFile">MIDI file:
+      <input id="midiFile" type="file" accept=".mid,.midi" aria-label="Upload MIDI file">
+    </label>
+
+    <div class="row" style="margin-top:.5rem;">
+      <select id="trackSelect" aria-label="Select MIDI track">
+        <option value="">(no file loaded)</option>
+      </select>
+      <button id="importMidiBtn">Import track</button>
+    </div>
+
+    <div id="midiInfo" class="muted" aria-live="polite">No MIDI loaded.</div>
+  </div>
+
+  <div class="status" aria-live="polite" id="status">Ready. Enter a human-readable sequence and press "Play & Convert".</div>
+
+<script>
+/* OpenGD77 Text -> Numeric converter & player (English)
+   - Converts human text -> numeric OpenGD77 pairs (note,length)
+   - Plays a preview via WebAudio
+   - MIDI import (simple SMF parser) extracts monophonic notes for editing
+   - Numeric output and playback are globally transposed DOWN by 2 octaves (-24 semitones)
+*/
+
+/* ---- configurable transpose ---- */
+const TRANSPOSE_SEMITONES = -24; // applied to numeric output and playback
+
+/* ---- UI elements ---- */
+const humanSeq = document.getElementById('humanSeq');
+const bpmInput = document.getElementById('bpm');
+const unitsInput = document.getElementById('unitsPerQuarter');
+const playBtn = document.getElementById('play');
+const stopBtn = document.getElementById('stop');
+const numericOut = document.getElementById('numericOut');
+const copyBtn = document.getElementById('copyBtn');
+const statusEl = document.getElementById('status');
+
+const toggleDocBtn = document.getElementById('toggleDoc');
+const docDiv = document.getElementById('doc');
+
+const midiFileInput = document.getElementById('midiFile');
+const trackSelect = document.getElementById('trackSelect');
+const importMidiBtn = document.getElementById('importMidiBtn');
+const midiInfo = document.getElementById('midiInfo');
+
+let audioCtx = null;
+let scheduled = [];
+let stopTimeout = null;
+let running = false;
+
+function setStatus(t){ statusEl.textContent = t; midiInfo.textContent = t; }
+
+/* Note name -> MIDI number */
+const SEMITONE = { 'C':0,'D':2,'E':4,'F':5,'G':7,'A':9,'B':11 };
+function noteNameToMidi(noteStr) {
+  if (!noteStr) return null;
+  const m = noteStr.match(/^([A-Ga-g])([#b]?)(-?\d+)$/);
+  if (!m) return null;
+  let [, letter, accidental, octaveStr] = m;
+  letter = letter.toUpperCase();
+  let sem = SEMITONE[letter];
+  if (accidental === '#') sem += 1;
+  if (accidental === 'b') sem -= 1;
+  const octave = parseInt(octaveStr, 10);
+  const midi = 12 + (octave * 12) + sem; // C0 = 12, C4 = 60
+  if (midi < 0 || midi > 127) return null;
+  return midi;
+}
+
+/* Duration parsing: returns duration in quarter-notes (1 = quarter) */
+function durationTokenToQuarters(tok) {
+  if (!tok) return null;
+  const t = tok.trim().toLowerCase();
+  const map = { 'whole':4,'w':4,'half':2,'h':2,'quarter':1,'q':1,'eighth':0.5,'e':0.5,'sixteenth':0.25,'s':0.25 };
+  if (map[t] !== undefined) return map[t];
+  const num = parseFloat(t);
+  if (!isNaN(num)) return num;
+  return null;
+}
+
+/* Parse human readable text into events */
+function parseHumanText(text) {
+  const tokens = text.split(/[\s,]+/).map(s=>s.trim()).filter(Boolean);
+  const events = [];
+  for (const tok of tokens) {
+    const parts = tok.split(':');
+    if (parts.length !== 2) continue;
+    const name = parts[0].trim();
+    const durTok = parts[1].trim();
+    const quarters = durationTokenToQuarters(durTok);
+    if (quarters === null) continue;
+    if (/^r$/i.test(name) || /^rest$/i.test(name)) {
+      events.push({ type:'rest', quarters });
+    } else {
+      const midi = noteNameToMidi(name);
+      if (midi === null) continue;
+      events.push({ type:'note', midi, quarters });
+    }
+  }
+  return events;
+}
+
+/* Convert human events to numeric OpenGD77 string (note,length pairs)
+   Apply global transpose here so numeric output is always transposed.
+*/
+function clampMidi(n) {
+  if (n < 0) return 0;
+  if (n > 127) return 127;
+  return n;
+}
+function humanEventsToNumericString(events, unitsPerQuarter) {
+  const parts = [];
+  for (const ev of events) {
+    const lengthUnits = Math.max(0, Math.round(ev.quarters * unitsPerQuarter));
+    if (ev.type === 'rest') {
+      parts.push(0, lengthUnits);
+    } else {
+      const transposed = clampMidi(ev.midi + TRANSPOSE_SEMITONES);
+      parts.push(transposed, lengthUnits);
+    }
+  }
+  return parts.join(',');
+}
+
+/* WebAudio scheduling (monophonic preview) - playback uses transposed pitches */
+function ensureAudioCtx(){
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  else if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+function freqFromMidi(n){ return 440 * Math.pow(2, (n - 69) / 12); }
+function scheduleNote(midi, startTime, duration){
+  ensureAudioCtx();
+  const osc1 = audioCtx.createOscillator();
+  const osc2 = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  osc1.type = 'sine';
+  osc2.type = 'triangle';
+  osc1.frequency.setValueAtTime(freqFromMidi(midi), startTime);
+  osc2.frequency.setValueAtTime(freqFromMidi(midi)*2.01, startTime);
+
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(0.9, startTime + 0.01);
+  gain.gain.linearRampToValueAtTime(0.6, startTime + 0.15);
+  gain.gain.linearRampToValueAtTime(0.0001, startTime + duration + 0.05);
+
+  osc1.connect(gain); osc2.connect(gain); gain.connect(audioCtx.destination);
+  osc1.start(startTime); osc2.start(startTime);
+  osc1.stop(startTime + duration + 0.1); osc2.stop(startTime + duration + 0.1);
+
+  scheduled.push({osc1, osc2, gain});
+}
+
+/* Clear scheduled audio nodes and timeouts */
+function clearScheduled(){
+  if (stopTimeout) { clearTimeout(stopTimeout); stopTimeout = null; }
+  for (const s of scheduled) {
+    try { if (s.osc1) s.osc1.stop(0); } catch(e){}
+    try { if (s.osc2) s.osc2.stop(0); } catch(e){}
+    try { if (s.gain) s.gain.disconnect(); } catch(e){}
+  }
+  scheduled = [];
+  if (audioCtx && audioCtx.state !== 'suspended') {
+    audioCtx.suspend();
+  }
+}
+
+/* Play & Convert flow */
+function playAndConvert() {
+  if (running) return;
+  const humanText = humanSeq.value;
+  const bpm = Number(bpmInput.value) || 120;
+  const unitsPerQuarter = Math.max(1, Math.round(Number(unitsInput.value) || 6));
+
+  const events = parseHumanText(humanText);
+  if (events.length === 0) {
+    setStatus('No valid events found. Please check your input syntax.');
+    return;
+  }
+
+  // Convert to numeric string and show immediately (transposed)
+  const numericStr = humanEventsToNumericString(events, unitsPerQuarter);
+  numericOut.value = numericStr;
+  numericOut.select && numericOut.select();
+
+  // Playback scheduling (transposed)
+  ensureAudioCtx();
+  running = true;
+  setStatus('Playing and producing OpenGD77 notation...');
+
+  const startNow = audioCtx.currentTime + 0.05;
+  let cursor = 0;
+  for (const ev of events) {
+    const durationSec = ev.quarters * (60 / bpm);
+    if (ev.type === 'note') {
+      const transposed = clampMidi(ev.midi + TRANSPOSE_SEMITONES);
+      scheduleNote(transposed, startNow + cursor, durationSec);
+    }
+    cursor += durationSec;
+  }
+
+  stopTimeout = setTimeout(()=> {
+    running = false;
+    clearScheduled();
+    setStatus('Done. OpenGD77 notation created — you can copy it now.');
+  }, Math.max(100, Math.round(cursor*1000)) + 200);
+}
+
+/* UI bindings */
+playBtn.addEventListener('click', () => {
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  playAndConvert();
+});
+
+stopBtn.addEventListener('click', () => {
+  if (!running) { setStatus('Not running.'); return; }
+  clearScheduled();
+  running = false;
+  setStatus('Playback stopped.');
+});
+
+copyBtn.addEventListener('click', async () => {
+  const val = numericOut.value;
+  if (!val) { setStatus('No OpenGD77 notation to copy.'); return; }
+  try {
+    await navigator.clipboard.writeText(val);
+    setStatus('Copied to clipboard.');
+  } catch (e) {
+    numericOut.select();
+    try {
+      document.execCommand('copy');
+      setStatus('Copied to clipboard (fallback).');
+    } catch (e2) {
+      setStatus('Copy failed. Select and copy manually.');
+    }
+  }
+});
+
+/* Toggle documentation */
+toggleDocBtn.addEventListener('click', () => {
+  const showing = docDiv.style.display !== 'none';
+  if (showing) {
+    docDiv.style.display = 'none';
+    toggleDocBtn.textContent = 'Show detailed documentation and examples';
+    toggleDocBtn.setAttribute('aria-expanded', 'false');
+    docDiv.setAttribute('aria-hidden', 'true');
+  } else {
+    docDiv.style.display = 'block';
+    toggleDocBtn.textContent = 'Hide documentation';
+    toggleDocBtn.setAttribute('aria-expanded', 'true');
+    docDiv.setAttribute('aria-hidden', 'false');
+  }
+});
+
+/* Keyboard: space toggles play/stop when textarea not focused */
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && document.activeElement !== humanSeq) {
+    e.preventDefault();
+    if (running) stopBtn.click(); else playBtn.click();
+  }
+});
+
+/* Initial status */
+setStatus('Ready. Enter a human-readable sequence and press "Play & Convert". Author: Richard Emling (DO9RE).');
+
+/* ======= MIDI parsing and import (compact SMF parser) ======= */
+/* Minimal parser: extracts Note-On/Note-Off pairs per track, returns tracks: [{name, notes:[{note,startTick,endTick}], lengthTicks}] */
+
+function readUint32(view, offs) {
+  return (view.getUint8(offs) << 24) | (view.getUint8(offs+1) << 16) | (view.getUint8(offs+2) << 8) | view.getUint8(offs+3);
+}
+function readUint16(view, offs) {
+  return (view.getUint8(offs) << 8) | view.getUint8(offs+1);
+}
+function readStr(view, offs, len) {
+  let s = '';
+  for (let i=0;i<len;i++) s += String.fromCharCode(view.getUint8(offs+i));
+  return s;
+}
+
+function parseMidiArrayBuffer(arrayBuffer) {
+  const view = new DataView(arrayBuffer);
+  let pos = 0;
+  // Header chunk
+  const hdr = readStr(view, pos, 4); pos += 4;
+  if (hdr !== 'MThd') throw new Error('Invalid MIDI file (no MThd)');
+  const hdrLen = readUint32(view, pos); pos += 4;
+  if (hdrLen < 6) throw new Error('Invalid header length');
+  const format = readUint16(view, pos); pos += 2;
+  const ntrks = readUint16(view, pos); pos += 2;
+  const division = readUint16(view, pos); pos += 2;
+  const ticksPerQuarter = division & 0x7FFF;
+
+  pos = 8 + hdrLen; // advance to first chunk
+
+  const tracks = [];
+
+  for (let t=0;t<ntrks;t++) {
+    if (pos >= view.byteLength) break;
+    const chunkType = readStr(view, pos, 4); pos += 4;
+    const chunkLen = readUint32(view, pos); pos += 4;
+    if (chunkType !== 'MTrk') { pos += chunkLen; continue; }
+    const trackEnd = pos + chunkLen;
+    const trackObj = { name: `Track ${t+1}`, notes: [], lengthTicks: 0 };
+    let absTick = 0;
+    let runningStatus = null;
+    const active = {}; // key = channel_note -> {startTick, velocity}
+    while (pos < trackEnd) {
+      // delta-time varlen
+      let deltaTicks = 0;
+      while (true) {
+        const b = view.getUint8(pos++);
+        deltaTicks = (deltaTicks << 7) | (b & 0x7F);
+        if (!(b & 0x80)) break;
+      }
+      absTick += deltaTicks;
+
+      if (pos >= trackEnd) break;
+      let statusByte = view.getUint8(pos++);
+      if (statusByte === 0xFF) {
+        const metaType = view.getUint8(pos++);
+        let len = 0;
+        while (true) {
+          const b = view.getUint8(pos++);
+          len = (len << 7) | (b & 0x7F);
+          if (!(b & 0x80)) break;
+        }
+        if (metaType === 0x03) {
+          const name = readStr(view, pos, len);
+          trackObj.name = name || trackObj.name;
+        }
+        pos += len;
+        if (metaType === 0x2F) { trackObj.lengthTicks = absTick; break; }
+      } else if (statusByte === 0xF0 || statusByte === 0xF7) {
+        let len = 0;
+        while (true) {
+          const b = view.getUint8(pos++);
+          len = (len << 7) | (b & 0x7F);
+          if (!(b & 0x80)) break;
+        }
+        pos += len;
+      } else {
+        let eventTypeByte;
+        if (statusByte & 0x80) { runningStatus = statusByte; eventTypeByte = runningStatus; }
+        else { if (!runningStatus) { continue; } eventTypeByte = runningStatus; pos--; }
+        const eventType = (eventTypeByte & 0xF0) >> 4;
+        const channel = eventTypeByte & 0x0F;
+        function readData() { return view.getUint8(pos++); }
+        if (eventType === 0x8) {
+          const noteNumber = readData(); const velocity = readData();
+          const key = channel + '_' + noteNumber;
+          const on = active[key];
+          if (on) { trackObj.notes.push({ note: noteNumber, startTick: on.startTick, endTick: absTick }); delete active[key]; }
+        } else if (eventType === 0x9) {
+          const noteNumber = readData(); const velocity = readData();
+          const key = channel + '_' + noteNumber;
+          if (velocity === 0) {
+            const on = active[key];
+            if (on) { trackObj.notes.push({ note: noteNumber, startTick: on.startTick, endTick: absTick }); delete active[key]; }
+          } else {
+            if (active[key]) { const prev = active[key]; trackObj.notes.push({ note: noteNumber, startTick: prev.startTick, endTick: absTick }); }
+            active[key] = { startTick: absTick, velocity };
+          }
+        } else if (eventType === 0xA || eventType === 0xB || eventType === 0xE) { pos += 2; }
+        else if (eventType === 0xC || eventType === 0xD) { pos += 1; }
+      }
+    } // end track parse
+
+    for (const k in active) {
+      const on = active[k];
+      const parts = k.split('_');
+      const noteNumber = parseInt(parts[1], 10);
+      trackObj.notes.push({ note: noteNumber, startTick: on.startTick, endTick: trackObj.lengthTicks || absTick });
+    }
+    trackObj.notes.sort((a,b) => a.startTick - b.startTick || a.endTick - b.endTick);
+    tracks.push(trackObj);
+    pos = trackEnd;
+  }
+
+  return { ticksPerQuarter, format, tracks };
+}
+
+/* Utility: convert MIDI note number to note name like C4, C#4 */
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+function midiToNoteName(midi) {
+  if (midi < 0 || midi > 127) return null;
+  const name = NOTE_NAMES[midi % 12];
+  const octave = Math.floor(midi / 12) - 1;
+  return `${name}${octave}`;
+}
+
+/* Convert parsed track notes into human-readable tokens.
+   - Rests for gaps
+   - If multiple notes start at same tick, pick lowest MIDI note
+   - DO NOT transpose here: textarea keeps original pitches for editing
+*/
+function convertTrackToHumanText(track, ticksPerQuarter) {
+  const notes = track.notes.slice();
+  if (!notes || notes.length === 0) return '';
+  const tokens = [];
+  let cursorTick = 0;
+
+  const groups = [];
+  let i = 0;
+  while (i < notes.length) {
+    const st = notes[i].startTick;
+    const group = [notes[i]];
+    i++;
+    while (i < notes.length && notes[i].startTick === st) {
+      group.push(notes[i]);
+      i++;
+    }
+    groups.push(group);
+  }
+
+  for (const g of groups) {
+    let chosen = g[0];
+    for (let k = 1; k < g.length; k++) if (g[k].note < chosen.note) chosen = g[k];
+    const gap = chosen.startTick - cursorTick;
+    if (gap > 0) {
+      const gapQuarters = gap / ticksPerQuarter;
+      tokens.push(`R:${trimDuration(gapQuarters)}`);
+    }
+    const durTicks = Math.max(1, chosen.endTick - chosen.startTick);
+    const durQuarters = durTicks / ticksPerQuarter;
+    const noteName = midiToNoteName(chosen.note) || `M${chosen.note}`;
+    tokens.push(`${noteName}:${trimDuration(durQuarters)}`);
+    cursorTick = chosen.endTick;
+  }
+
+  return tokens.join(' ');
+}
+function trimDuration(q) {
+  if (Math.abs(q - Math.round(q)) < 1e-9) return String(Math.round(q));
+  let s = q.toFixed(3);
+  s = s.replace(/\.?0+$/, '');
+  return s;
+}
+
+/* File input handling */
+let lastParsedMidi = null;
+midiFileInput.addEventListener('change', async (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) {
+    trackSelect.innerHTML = '<option value="">(no file loaded)</option>';
+    setStatus('No MIDI loaded.');
+    lastParsedMidi = null;
+    return;
+  }
+  setStatus(`Reading ${f.name}...`);
+  try {
+    const ab = await f.arrayBuffer();
+    const parsed = parseMidiArrayBuffer(ab);
+    lastParsedMidi = parsed;
+    trackSelect.innerHTML = '';
+    parsed.tracks.forEach((trk, idx) => {
+      const opt = document.createElement('option');
+      opt.value = String(idx);
+      opt.textContent = `${idx+1}: ${trk.name} (${trk.notes.length} notes)`;
+      trackSelect.appendChild(opt);
+    });
+    if (parsed.tracks.length === 0) {
+      trackSelect.innerHTML = '<option value="">(no tracks)</option>';
+      setStatus('MIDI loaded but no tracks found.');
+    } else {
+      setStatus(`MIDI loaded: ${parsed.tracks.length} track(s). Select and press Import track.`);
+      midiInfo.textContent = `Ticks per quarter: ${parsed.ticksPerQuarter}`;
+    }
+  } catch (err) {
+    console.error(err);
+    setStatus('Failed to parse MIDI file.');
+    lastParsedMidi = null;
+  }
+});
+
+/* Import selected track -> convert -> insert into textarea */
+importMidiBtn.addEventListener('click', () => {
+  if (!lastParsedMidi) {
+    setStatus('No MIDI file loaded.');
+    return;
+  }
+  const idx = trackSelect.value === '' ? 0 : Number(trackSelect.value);
+  if (isNaN(idx) || idx < 0 || idx >= lastParsedMidi.tracks.length) {
+    setStatus('Select a valid track.');
+    return;
+  }
+  const track = lastParsedMidi.tracks[idx];
+  const txt = convertTrackToHumanText(track, lastParsedMidi.ticksPerQuarter || 480);
+  if (!txt) {
+    setStatus('Selected track contains no notes.');
+    return;
+  }
+  humanSeq.value = txt;
+  humanSeq.focus();
+  setStatus(`Imported track "${track.name}" with ${track.notes.length} notes. (Only lowest simultaneous notes kept.)`);
+});
+</script>
+</body>
+</html>
